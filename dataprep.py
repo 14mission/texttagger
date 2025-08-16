@@ -31,18 +31,25 @@ random.seed(666)
 
 linenum = 0
 writeto = None
+aftertok = False
 for ln in instrm:
   if linenum % batchsize == 0:
     rndnum = random.randrange(1000) * 0.001
+    prevwriteto = writeto
     if rndnum < valfrac:
       writeto = "val"
     elif rndnum < valfrac + tstfrac:
       writeto = "tst"
     else:
       writeto = "trn"
+    if writeto != prevwriteto:
+      aftertok = False
+  if len(ln) > 0 and ln[0] == ' ' and aftertok:
+    print("",file=(outvalstrm if writeto == "val" else (outtststrm if writeto == "tst" else outtrnstrm)))
+    aftertok = False
   for tok in ln.split():
     normtok = re.sub(r'"|^\'|\'$','',tok)
-    if re.match(r'^.*?\[\.:;-]+$', normtok): 
+    if re.match(r'^.*?[\.:;-]+$', normtok): 
       punctag = "PD"
     elif re.match(r'^.*?\?$', normtok):
       punctag = "QM"
@@ -57,4 +64,5 @@ for ln in instrm:
     if len(normtok) > 0:
       print(normtok + "\t" + punctag,
        file=(outvalstrm if writeto == "val" else (outtststrm if writeto == "tst" else outtrnstrm)))
+      aftertok = True
   linenum += 1
