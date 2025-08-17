@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import sys, re
 from transformers import AutoTokenizer, AutoModelForTokenClassification
+from transformers import TrainingArguments, Trainer
 from datasets import Dataset, DatasetDict
 
 tokenizer = None
@@ -30,7 +31,7 @@ def loaddata(fn,labels):
   return Dataset.from_list(pglist)
 
 def tokenize_and_align_labels(example):
-  tokenized = tokenizer(example["tokens"], is_split_into_words=True, truncation=True)
+  tokenized = tokenizer(example["tokens"], is_split_into_words=True, truncation=True, padding='max_length', max_length=512)
   word_ids = tokenized.word_ids()  # map tokens to word indices
   aligned_labels = []
   for word_idx in word_ids:
@@ -39,6 +40,7 @@ def tokenize_and_align_labels(example):
     else:
       aligned_labels.append(label2id[example["tags"][word_idx]])
   tokenized["labels"] = aligned_labels
+  #print("foo: "+str(len(tokenized.word_ids()))+","+str(len(tokenized["labels"])))
   return tokenized
 
 def main():
@@ -78,10 +80,39 @@ def main():
       continue
     print("tokenize "+setname)
     tokenized_datasets[setname] = datasets[setname].map(tokenize_and_align_labels)
+    tokenized_datasets[setname] = tokenized_datasets[setname].remove_columns(datasets[setname].column_names)
     print(str(tokenized_datasets[setname]))
 
   print("done")
-  
+
+  model = AutoModelForTokenClassification.from_pretrained(
+    "bert-base-uncased",
+    num_labels=len(labels),
+    id2label=id2label,
+    label2id=label2id
+  )
+
+  print("trainargs")
+  trainargs = TrainingArguments(
+    output_dir="./run",
+    eval_strategy="epoch",
+    save_strategy="epoch",
+    learning_rate=5e-5,
+    per_device_train_batch_size=16,
+    per_device_eval_batch_size=16,
+    num_train_epochs=3,
+    weight_decay=0.01,
+  )
+
+  print("train")
+  trainer = Trainer(
+    model=model,
+    args=trainargs,
+    train_dataset=tokenized_datasets["trn"],
+    eval_dataset=tokenized_datasets["val"],
+    tokenizer=tokenizer,
+  )
+  trainer.train()
   
   #model = AutoModelForTokenClassification.from_pretrained(
   #    "bert-base-uncased",
