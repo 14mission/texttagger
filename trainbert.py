@@ -96,7 +96,7 @@ def main():
   
     print("trainargs")
     trainargs = TrainingArguments(
-      output_dir="./run",
+      output_dir="./run/bert",
       eval_strategy=("steps" if quickmode else "epoch"),
       save_strategy=("steps" if quickmode else "epoch"),
       learning_rate=5e-5,
@@ -109,7 +109,7 @@ def main():
       eval_steps = 25, #only applicable in quickmode
     )
 
-    for oldcheckpoint in glob.glob("run/checkpoint-*"):
+    for oldcheckpoint in glob.glob("run/bert/checkpoint-*"):
       print("del old: "+oldcheckpoint)
       shutil.rmtree(oldcheckpoint)
   
@@ -124,12 +124,10 @@ def main():
     trainer.train()
 
     # copy last checkpoint to checkpoint-latest
-    checkpoints = natsorted(glob.glob("run/checkpoint-*"))
+    checkpoints = natsorted(glob.glob("run/bert/checkpoint-*"))
     print("checkpoints: "+",".join(checkpoints))
     if len(checkpoints) == 0:
       raise Exception("no checkpoints")
-    if os.path.exists("run/checkpoint-last"):
-      shutil.rmtree("run/checkpoint-last")
-    shutil.copytree(checkpoints[-1],"run/checkpoint-last")
+    shutil.copytree(checkpoints[-1],"run/bert/checkpoint-last")
   
 main()
