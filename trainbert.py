@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-import sys, re
+import sys, re, glob, shutil, os
 from transformers import AutoTokenizer, AutoModelForTokenClassification
 from transformers import TrainingArguments, Trainer
 from datasets import Dataset, DatasetDict
+from natsort import natsorted
 
 tokenizer = None
 label2id = None
@@ -48,19 +49,18 @@ def main():
   global tokenizer, label2id, id2label
 
   trnfn, valfn, tstfn = None, None, None
+  quickmode = False
   av = sys.argv[1:]
   ac = 0
   while ac < len(av):
     if av[ac][0] != '-': raise Exception("nonflag: "+av[ac])
+    elif av[ac] == "-q": quickmode = True
     elif ac+1 == len(av) or av[ac+1][0] == '-': raise Exception("novalfor: "+av[ac])
     elif av[ac] == "-trn": ac += 1; trnfn = av[ac]
     elif av[ac] == "-val": ac += 1; valfn = av[ac]
     elif av[ac] == "-tst": ac += 1; tstfn = av[ac]
     else: raise Exception("unkflag: "+av[ac])
     ac += 1
-  if valfn == None: raise Exception("need -val VALFN")
-  if trnfn == None: raise Exception("need -trn TRNFN")
-  #if tstfn == None: raise Exception("need -tst TSTFN")
   
   # load data
   labels = []
@@ -71,7 +71,7 @@ def main():
   print("labels: "+",".join(labels))
   label2id = {l: i for i, l in enumerate(labels)}
   id2label = {i: l for l, i in label2id.items()}
-  
+
   # tokenize
   tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
   tokenized_datasets = {}
@@ -83,40 +83,53 @@ def main():
     tokenized_datasets[setname] = tokenized_datasets[setname].remove_columns(datasets[setname].column_names)
     print(str(tokenized_datasets[setname]))
 
-  print("done")
+  # training a model?
+  if tokenized_datasets["trn"] != None and tokenized_datasets["val"] != None:
 
-  model = AutoModelForTokenClassification.from_pretrained(
-    "bert-base-uncased",
-    num_labels=len(labels),
-    id2label=id2label,
-    label2id=label2id
-  )
-
-  print("trainargs")
-  trainargs = TrainingArguments(
-    output_dir="./run",
-    eval_strategy="epoch",
-    save_strategy="epoch",
-    learning_rate=5e-5,
-    per_device_train_batch_size=16,
-    per_device_eval_batch_size=16,
-    num_train_epochs=3,
-    weight_decay=0.01,
-  )
-
-  print("train")
-  trainer = Trainer(
-    model=model,
-    args=trainargs,
-    train_dataset=tokenized_datasets["trn"],
-    eval_dataset=tokenized_datasets["val"],
-    tokenizer=tokenizer,
-  )
-  trainer.train()
+    print("modelobj")
+    model = AutoModelForTokenClassification.from_pretrained(
+      "bert-base-uncased",
+      num_labels=len(labels),
+      id2label=id2label,
+      label2id=label2id
+    )
   
-  #model = AutoModelForTokenClassification.from_pretrained(
-  #    "bert-base-uncased",
-  #    num_labels=len(label_list)
-  #)
+    print("trainargs")
+    trainargs = TrainingArguments(
+      output_dir="./run",
+      eval_strategy=("steps" if quickmode else "epoch"),
+      save_strategy=("steps" if quickmode else "epoch"),
+      learning_rate=5e-5,
+      per_device_train_batch_size=16,
+      per_device_eval_batch_size=16,
+      num_train_epochs=(1 if quickmode else 3),
+      max_steps=(50 if quickmode else -1),
+      weight_decay=0.01,
+      save_steps = 25, #only applicable in quickmode
+      eval_steps = 25, #only applicable in quickmode
+    )
 
+    for oldcheckpoint in glob.glob("run/checkpoint-*"):
+      print("del old: "+oldcheckpoint)
+      shutil.rmtree(oldcheckpoint)
+  
+    print("train")
+    trainer = Trainer(
+      model=model,
+      args=trainargs,
+      train_dataset=tokenized_datasets["trn"],
+      eval_dataset=tokenized_datasets["val"],
+      tokenizer=tokenizer,
+    )
+    trainer.train()
+
+    # copy last checkpoint to checkpoint-latest
+    checkpoints = natsorted(glob.glob("run/checkpoint-*"))
+    print("checkpoints: "+",".join(checkpoints))
+    if len(checkpoints) == 0:
+      raise Exception("no checkpoints")
+    if os.path.exists("run/checkpoint-last"):
+      shutil.rmtree("run/checkpoint-last")
+    shutil.copytree(checkpoints[-1],"run/checkpoint-last")
+  
 main()
