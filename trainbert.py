@@ -2,6 +2,7 @@
 import sys, re, glob, shutil, os
 from transformers import AutoTokenizer, AutoModelForTokenClassification
 from transformers import TrainingArguments, Trainer
+from transformers import pipeline
 from datasets import Dataset, DatasetDict
 from natsort import natsorted
 
@@ -48,7 +49,7 @@ def main():
 
   global tokenizer, label2id, id2label
 
-  trnfn, valfn, tstfn = None, None, None
+  trnfn, valfn, tstfn, inferoutfn = None, None, None, None
   quickmode = False
   av = sys.argv[1:]
   ac = 0
@@ -59,6 +60,7 @@ def main():
     elif av[ac] == "-trn": ac += 1; trnfn = av[ac]
     elif av[ac] == "-val": ac += 1; valfn = av[ac]
     elif av[ac] == "-tst": ac += 1; tstfn = av[ac]
+    elif av[ac] == "-out": ac += 1; inferoutfn = av[ac]
     else: raise Exception("unkflag: "+av[ac])
     ac += 1
   
@@ -74,7 +76,7 @@ def main():
 
   # tokenize
   tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
-  tokenized_datasets = {}
+  tokenized_datasets = { "trn":None, "val":None, "tst":None }
   for setname in datasets:
     if datasets[setname] == None:
       continue
@@ -129,5 +131,33 @@ def main():
     if len(checkpoints) == 0:
       raise Exception("no checkpoints")
     shutil.copytree(checkpoints[-1],"run/bert/checkpoint-last")
-  
+
+  # inference?
+  if datasets["tst"] != None:
+    print("inference")
+    if inferoutfn == None:
+      outstream = sys.stdout
+    else:
+      outstream = open(inferoutfn,"w")
+    # set up tagger
+    tagger = pipeline("token-classification", model="run/bert/checkpoint-last", tokenizer=tokenizer, aggregation_strategy="none")
+    # sample pg
+    sampleinput="it was a dark and stormy night suddenly a shot rang out the maid screamed a door slammed then a pirate ship appeared on the horizon"
+    samplewordlist = sampleinput.split()
+    sampletaglist = [item["entity"] for item in tagger(sampleinput)]
+    print(" ".join(samplewordlist[i]+":"+sampletaglist[i] for i in range(len(samplewordlist))))
+    # infererence set
+    pgnum = 0
+    for pg in datasets["tst"]:
+      wordlist = pg["tokens"]
+      reftags = pg["tags"]
+      hyptags = [item["entity"] for item in tagger(" ".join(wordlist))]
+      for i in range(len(wordlist)):
+        print("\t".join([wordlist[i],reftags[i],hyptags[i]]),file=outstream)
+      print("",file=outstream)
+      pgnum += 1
+      if re.match(r'^[125]0*$',str(pgnum)):
+        print("did "+str(pgnum))
+    print("did "+str(pgnum)+"; done")
+
 main()
