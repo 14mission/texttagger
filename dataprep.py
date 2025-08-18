@@ -50,15 +50,15 @@ for ln in instrm:
   for tok in ln.split():
     normtok = re.sub(r'"|^\'|\'$','',tok)
     if re.match(r'^.*?[\.:;-]+$', normtok): 
-      punctag = "PD"
+      punctag = "P"
     elif re.match(r'^.*?\?$', normtok):
-      punctag = "QM"
+      punctag = "Q"
     elif re.match(r'^.*?\!$', normtok):
-      punctag = "XP"
+      punctag = "X"
     elif re.match(r'^.*?,$', normtok):
-      punctag = "CO"
+      punctag = "C"
     else:
-      punctag = "NO"
+      punctag = "_"
     normtok = normtok.lower()
     normtok = re.sub(r'(^\W+|\W+$)','',normtok)
     if len(normtok) > 0:
