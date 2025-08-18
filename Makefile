@@ -9,8 +9,9 @@ run/placeholder.txt:
 	mkdir run
 	touch run/placeholder.txt
 
+# add -q for quick test
 run/bert/checkpoint-last/config.json: run/hpl.sents.tokstags.trn.txt run/hpl.sents.tokstags.val.txt run/bert/placeholder.txt
-	python3 ./trainbert.py -q -trn run/hpl.sents.tokstags.trn.txt -val run/hpl.sents.tokstags.val.txt
+	python3 ./trainbert.py -trn run/hpl.sents.tokstags.trn.txt -val run/hpl.sents.tokstags.val.txt
 
 run/bert/placeholder.txt:
 	mkdir run/bert
