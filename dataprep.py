@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import re, sys, random
+from math import log
 
 infn, outtrnfn, outvalfn, outtstfn = None, None, None, None
 batchsize = 100
@@ -31,7 +32,8 @@ random.seed(666)
 
 linenum = 0
 writeto = None
-aftertok = False
+pglen = 0
+pglenhgram = []
 for ln in instrm:
   if linenum % batchsize == 0:
     rndnum = random.randrange(1000) * 0.001
@@ -43,10 +45,16 @@ for ln in instrm:
     else:
       writeto = "trn"
     if writeto != prevwriteto:
-      aftertok = False
-  if len(ln) > 0 and ln[0] == ' ' and aftertok:
+      pglen = 0
+  if len(ln) > 0 and ln[0] == ' ' and pglen > 0:
     print("",file=(outvalstrm if writeto == "val" else (outtststrm if writeto == "tst" else outtrnstrm)))
-    aftertok = False
+    log2pglen = int(log(pglen)/log(2))
+    #print(f"foo: {pglen} {log2pglen}")
+    while len(pglenhgram) <= log2pglen:
+      pglenhgram.append(0)
+    pglenhgram[log2pglen] += 1
+    pglen = 0
+    continue
   for tok in ln.split():
     normtok = re.sub(r'"|^\'|\'$','',tok)
     if re.match(r'^.*?[\.:;-]+$', normtok): 
@@ -64,5 +72,15 @@ for ln in instrm:
     if len(normtok) > 0:
       print(normtok + "\t" + punctag,
        file=(outvalstrm if writeto == "val" else (outtststrm if writeto == "tst" else outtrnstrm)))
-      aftertok = True
+      pglen += 1
+    
   linenum += 1
+
+if pglen > 0:
+  log2pglen = int(log(pglen)/log(2))
+  while len(pglenhgram) <= log2pglen:
+    pglenhgram.append(0)
+  pglenhgram[log2pglen] += 1
+print("pglens")
+for p in range(len(pglenhgram)):
+  print(str(2**p)+"-"+str(2**(p+1)-1)+"\t"+str(pglenhgram[p]))
