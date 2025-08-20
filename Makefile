@@ -1,4 +1,4 @@
-all: run/hpl.sents.tokstags.tst.infer.bert.txt
+all: run/hpl.sents.tokstags.tst.infer.scoring.txt
 
 run/hpl.sents.tokstags.val.txt: run/hpl.sents.tokstags.trn.txt
 run/hpl.sents.tokstags.tst.txt: run/hpl.sents.tokstags.trn.txt
@@ -20,3 +20,5 @@ run/bert/placeholder.txt:
 run/hpl.sents.tokstags.tst.infer.bert.txt: run/bert/checkpoint-last/config.json trainbert.py
 	python3 ./trainbert.py -tst run/hpl.sents.tokstags.tst.txt -out run/hpl.sents.tokstags.tst.infer.bert.txt
 
+run/hpl.sents.tokstags.tst.infer.scoring.txt: run/hpl.sents.tokstags.tst.infer.bert.txt scorepunc.py
+	python3 ./scorepunc.py run/hpl.sents.tokstags.tst.infer.bert.txt > run/hpl.sents.tokstags.tst.infer.scoring.txt
