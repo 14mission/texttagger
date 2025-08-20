@@ -5,6 +5,7 @@ from transformers import TrainingArguments, Trainer
 from transformers import pipeline
 from datasets import Dataset, DatasetDict
 from natsort import natsorted
+import torch
 
 tokenizer = None
 label2id = None
@@ -45,6 +46,37 @@ def tokenize_and_align_labels(example):
   #print("foo: "+str(len(tokenized.word_ids()))+","+str(len(tokenized["labels"])))
   return tokenized
 
+def tagtokens(model,tokenizer,tokens):
+  
+  encodings = tokenizer(
+    tokens,
+    is_split_into_words=True,
+    return_tensors="pt",
+    truncation=True,       # cut off anything past max_length
+    max_length=512,        # enforce the 512-token limit
+    padding="max_length" 
+  )
+
+  with torch.no_grad():
+    outputs = model(**encodings)
+
+  logits = outputs.logits
+  pred_ids = torch.argmax(logits, dim=-1)
+
+  # Map back to labels
+  subword_pred_labels = [model.config.id2label[p.item()] for p in pred_ids[0]]
+  subword_to_word = word_ids = encodings.word_ids(batch_index=0)
+
+  word_pred_labels = ["_" for tok in tokens]
+  for i in range(len(subword_to_word)):
+    if subword_to_word[i] != None:
+      word_pred_labels[subword_to_word[i]] = subword_pred_labels[i]
+
+  #for i in range(len(tokens)):
+  #  print(tokens[i]+"="+word_pred_labels[i])
+
+  return word_pred_labels
+ 
 def main():
 
   global tokenizer, label2id, id2label
@@ -142,16 +174,17 @@ def main():
     # set up tagger
     tagger = pipeline("token-classification", model="run/bert/checkpoint-last", tokenizer=tokenizer, aggregation_strategy="none")
     # sample pg
-    sampleinput="it was a dark and stormy night suddenly a shot rang out the maid screamed a door slammed then a pirate ship appeared on the horizon"
+    sampleinput="it was a dark and stormy night suddenly a shot rang out the maid screamed a door slammed then a pirate ship appeared on the horizon llanfairpwllgwyngyllgogerychwyrndrobwllllantysiliogogogoch"
     samplewordlist = sampleinput.split()
-    sampletaglist = [item["entity"] for item in tagger(sampleinput)]
+    model = AutoModelForTokenClassification.from_pretrained("run/bert/checkpoint-last")
+    sampletaglist = tagtokens(model,tokenizer,samplewordlist)
     print(" ".join(samplewordlist[i]+":"+sampletaglist[i] for i in range(len(samplewordlist))))
     # infererence set
     pgnum = 0
     for pg in datasets["tst"]:
       wordlist = pg["tokens"]
       reftags = pg["tags"]
-      hyptags = [item["entity"] for item in tagger(" ".join(wordlist))]
+      hyptags = tagtokens(model,tokenizer,wordlist)
       for i in range(len(wordlist)):
         print("\t".join([wordlist[i],reftags[i],hyptags[i]]),file=outstream)
       print("",file=outstream)
