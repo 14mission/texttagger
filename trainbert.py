@@ -81,7 +81,7 @@ def main():
 
   global tokenizer, label2id, id2label
 
-  trnfn, valfn, tstfn, inferoutfn = None, None, None, None
+  trnfn, valfn, tstfn, inferoutfn, modeldir = None, None, None, None, "bert"
   quickmode = False
   av = sys.argv[1:]
   ac = 0
@@ -93,6 +93,7 @@ def main():
     elif av[ac] == "-val": ac += 1; valfn = av[ac]
     elif av[ac] == "-tst": ac += 1; tstfn = av[ac]
     elif av[ac] == "-out": ac += 1; inferoutfn = av[ac]
+    elif av[ac] == "-mod": ac += 1; modeldir = av[ac]
     else: raise Exception("unkflag: "+av[ac])
     ac += 1
   
@@ -130,7 +131,7 @@ def main():
   
     print("trainargs")
     trainargs = TrainingArguments(
-      output_dir="./run/bert",
+      output_dir=modeldir,
       eval_strategy=("steps" if quickmode else "epoch"),
       save_strategy=("steps" if quickmode else "epoch"),
       learning_rate=5e-5,
@@ -143,7 +144,7 @@ def main():
       eval_steps = 25, #only applicable in quickmode
     )
 
-    for oldcheckpoint in glob.glob("run/bert/checkpoint-*"):
+    for oldcheckpoint in glob.glob(modeldir+"/checkpoint-*"):
       print("del old: "+oldcheckpoint)
       shutil.rmtree(oldcheckpoint)
   
@@ -158,11 +159,11 @@ def main():
     trainer.train()
 
     # copy last checkpoint to checkpoint-latest
-    checkpoints = natsorted(glob.glob("run/bert/checkpoint-*"))
+    checkpoints = natsorted(glob.glob(modeldir+"/checkpoint-*"))
     print("checkpoints: "+",".join(checkpoints))
     if len(checkpoints) == 0:
       raise Exception("no checkpoints")
-    shutil.copytree(checkpoints[-1],"run/bert/checkpoint-last")
+    shutil.copytree(checkpoints[-1],modeldir+"/checkpoint-last")
 
   # inference?
   if datasets["tst"] != None:
@@ -172,11 +173,11 @@ def main():
     else:
       outstream = open(inferoutfn,"w")
     # set up tagger
-    tagger = pipeline("token-classification", model="run/bert/checkpoint-last", tokenizer=tokenizer, aggregation_strategy="none")
+    tagger = pipeline("token-classification", model=modeldir+"/checkpoint-last", tokenizer=tokenizer, aggregation_strategy="none")
     # sample pg
     sampleinput="it was a dark and stormy night suddenly a shot rang out the maid screamed a door slammed then a pirate ship appeared on the horizon llanfairpwllgwyngyllgogerychwyrndrobwllllantysiliogogogoch"
     samplewordlist = sampleinput.split()
-    model = AutoModelForTokenClassification.from_pretrained("run/bert/checkpoint-last")
+    model = AutoModelForTokenClassification.from_pretrained(modeldir+"/checkpoint-last")
     sampletaglist = tagtokens(model,tokenizer,samplewordlist)
     print(" ".join(samplewordlist[i]+":"+sampletaglist[i] for i in range(len(samplewordlist))))
     # infererence set

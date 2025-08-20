@@ -16,6 +16,8 @@ while ac < len(av):
   elif av[ac] == "-trn": ac += 1; outtrnfn = av[ac]
   elif av[ac] == "-val": ac += 1; outvalfn = av[ac]
   elif av[ac] == "-tst": ac += 1; outtstfn = av[ac]
+  elif av[ac] == "-vf": ac += 1; valfrac = float(av[ac])
+  elif av[ac] == "-tf": ac += 1; tstfrac = float(av[ac])
   else: raise Exception("unkflag: "+av[ac])
   ac += 1
 if infn == None: raise Exception("need -i INFN")
