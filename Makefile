@@ -20,5 +20,17 @@ run/bertpre/placeholder.txt:
 run/hpl.sents.tokstags.tst.infer.bertpre.txt: run/bertpre/checkpoint-last/config.json trainbert.py
 	python3 ./trainbert.py -tst run/hpl.sents.tokstags.tst.txt -out run/hpl.sents.tokstags.tst.infer.bertpre.txt -mod run/bertpre
 
-run/hpl.sents.tokstags.tst.infer.scoring.txt: run/hpl.sents.tokstags.tst.infer.bertpre.txt scorepunc.py
-	python3 ./scorepunc.py run/hpl.sents.tokstags.tst.infer.bertpre.txt > run/hpl.sents.tokstags.tst.infer.scoring.txt
+
+# add -q for quick test
+run/bertraw/checkpoint-last/config.json: run/hpl.sents.tokstags.trn.txt run/hpl.sents.tokstags.val.txt run/bertraw/placeholder.txt
+	python3 ./trainbert.py -raw -trn run/hpl.sents.tokstags.trn.txt -val run/hpl.sents.tokstags.val.txt -mod run/bertraw
+
+run/bertraw/placeholder.txt:
+	mkdir run/bertraw
+	touch run/bertraw/placeholder.txt
+
+run/hpl.sents.tokstags.tst.infer.bertraw.txt: run/bertraw/checkpoint-last/config.json trainbert.py
+	python3 ./trainbert.py -tst run/hpl.sents.tokstags.tst.txt -out run/hpl.sents.tokstags.tst.infer.bertraw.txt -mod run/bertraw
+
+run/hpl.sents.tokstags.tst.infer.scoring.txt: run/hpl.sents.tokstags.tst.infer.bertpre.txt run/hpl.sents.tokstags.tst.infer.bertraw.txt scorepunc.py
+	python3 ./scorepunc.py run/hpl.sents.tokstags.tst.infer.bertpre.txt run/hpl.sents.tokstags.tst.infer.bertraw.txt > run/hpl.sents.tokstags.tst.infer.scoring.txt

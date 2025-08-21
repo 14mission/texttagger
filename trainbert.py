@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import sys, re, glob, shutil, os
 from transformers import AutoTokenizer, AutoModelForTokenClassification
+from transformers import BertConfig, BertForTokenClassification
 from transformers import TrainingArguments, Trainer
 from transformers import pipeline
 from datasets import Dataset, DatasetDict
@@ -83,11 +84,13 @@ def main():
 
   trnfn, valfn, tstfn, inferoutfn, modeldir = None, None, None, None, "bert"
   quickmode = False
+  rawmode = False
   av = sys.argv[1:]
   ac = 0
   while ac < len(av):
     if av[ac][0] != '-': raise Exception("nonflag: "+av[ac])
     elif av[ac] == "-q": quickmode = True
+    elif av[ac] == "-raw": rawmode = True
     elif ac+1 == len(av) or av[ac+1][0] == '-': raise Exception("novalfor: "+av[ac])
     elif av[ac] == "-trn": ac += 1; trnfn = av[ac]
     elif av[ac] == "-val": ac += 1; valfn = av[ac]
@@ -121,13 +124,30 @@ def main():
   # training a model?
   if tokenized_datasets["trn"] != None and tokenized_datasets["val"] != None:
 
-    print("modelobj")
-    model = AutoModelForTokenClassification.from_pretrained(
-      "bert-base-uncased",
-      num_labels=len(labels),
-      id2label=id2label,
-      label2id=label2id
-    )
+    model = None
+    if rawmode:
+      print("create empty bert model")
+      config = BertConfig(
+        vocab_size=tokenizer.vocab_size,      # must match your tokenizer
+        hidden_size=256,       # smaller than default BERT to train faster
+        num_hidden_layers=4,   # fewer layers for small-scale experiments
+        num_attention_heads=4,
+        intermediate_size=1024,
+        max_position_embeddings=512,
+        num_labels=len(label2id),
+        id2label=id2label,
+        label2id=label2id
+      )
+      model = BertForTokenClassification(config)
+
+    else:
+      print("load pretrained bert model")
+      model = AutoModelForTokenClassification.from_pretrained(
+        "bert-base-uncased",
+        num_labels=len(labels),
+        id2label=id2label,
+        label2id=label2id
+      )
   
     print("trainargs")
     trainargs = TrainingArguments(
