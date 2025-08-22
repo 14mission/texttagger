@@ -124,7 +124,7 @@ def main():
   # training a model?
   if tokenized_datasets["trn"] != None and tokenized_datasets["val"] != None:
 
-    model = None
+    model, trainargs = None, None
     if rawmode:
       print("create empty bert model")
       config = BertConfig(
@@ -134,11 +134,29 @@ def main():
         num_attention_heads=4,
         intermediate_size=1024,
         max_position_embeddings=512,
-        num_labels=len(label2id),
+        num_labels=len(labels),
         id2label=id2label,
         label2id=label2id
       )
       model = BertForTokenClassification(config)
+
+      trainargs = TrainingArguments(
+        output_dir=modeldir,
+        eval_strategy=("steps" if quickmode else "epoch"),
+        save_strategy=("steps" if quickmode else "epoch"),
+        learning_rate=5e-4,            # higher LR
+        per_device_train_batch_size=16,
+        per_device_eval_batch_size=16,
+        num_train_epochs=30,           # many epochs
+        max_steps=(100 if quickmode else -1),
+        warmup_ratio=0.1,              # 10% warmup
+        weight_decay=0.01,
+        save_steps = 25, #only applicable in quickmode
+        eval_steps = 25, #only applicable in quickmode
+        load_best_model_at_end=True,    # to keep track of best
+        report_to="none",
+        logging_first_step=True,
+      )
 
     else:
       print("load pretrained bert model")
@@ -149,25 +167,28 @@ def main():
         label2id=label2id
       )
   
-    print("trainargs")
-    trainargs = TrainingArguments(
-      output_dir=modeldir,
-      eval_strategy=("steps" if quickmode else "epoch"),
-      save_strategy=("steps" if quickmode else "epoch"),
-      learning_rate=5e-5,
-      per_device_train_batch_size=16,
-      per_device_eval_batch_size=16,
-      num_train_epochs=(1 if quickmode else 3),
-      max_steps=(50 if quickmode else -1),
-      weight_decay=0.01,
-      save_steps = 25, #only applicable in quickmode
-      eval_steps = 25, #only applicable in quickmode
-    )
+      print("trainargs")
+      trainargs = TrainingArguments(
+        output_dir=modeldir,
+        eval_strategy=("steps" if quickmode else "epoch"),
+        save_strategy=("steps" if quickmode else "epoch"),
+        learning_rate=5e-5,
+        per_device_train_batch_size=16,
+        per_device_eval_batch_size=16,
+        num_train_epochs=(1 if quickmode else 3),
+        max_steps=(50 if quickmode else -1),
+        weight_decay=0.01,
+        save_steps = 25, #only applicable in quickmode
+        eval_steps = 25, #only applicable in quickmode
+        load_best_model_at_end=True,
+        report_to="none",
+        logging_first_step=True,
+      )
 
     for oldcheckpoint in glob.glob(modeldir+"/checkpoint-*"):
       print("del old: "+oldcheckpoint)
       shutil.rmtree(oldcheckpoint)
-  
+
     print("train")
     trainer = Trainer(
       model=model,
@@ -178,12 +199,9 @@ def main():
     )
     trainer.train()
 
-    # copy last checkpoint to checkpoint-latest
-    checkpoints = natsorted(glob.glob(modeldir+"/checkpoint-*"))
-    print("checkpoints: "+",".join(checkpoints))
-    if len(checkpoints) == 0:
-      raise Exception("no checkpoints")
-    shutil.copytree(checkpoints[-1],modeldir+"/checkpoint-last")
+    # copy best checkpoint to checkpoint-best
+    print("best checkpoint: "+trainer.state.best_model_checkpoint)
+    shutil.copytree(trainer.state.best_model_checkpoint,modeldir+"/checkpoint-best")
 
   # inference?
   if datasets["tst"] != None:
@@ -193,11 +211,11 @@ def main():
     else:
       outstream = open(inferoutfn,"w")
     # set up tagger
-    tagger = pipeline("token-classification", model=modeldir+"/checkpoint-last", tokenizer=tokenizer, aggregation_strategy="none")
+    tagger = pipeline("token-classification", model=modeldir+"/checkpoint-best", tokenizer=tokenizer, aggregation_strategy="none")
     # sample pg
     sampleinput="it was a dark and stormy night suddenly a shot rang out the maid screamed a door slammed then a pirate ship appeared on the horizon llanfairpwllgwyngyllgogerychwyrndrobwllllantysiliogogogoch"
     samplewordlist = sampleinput.split()
-    model = AutoModelForTokenClassification.from_pretrained(modeldir+"/checkpoint-last")
+    model = AutoModelForTokenClassification.from_pretrained(modeldir+"/checkpoint-best")
     sampletaglist = tagtokens(model,tokenizer,samplewordlist)
     print(" ".join(samplewordlist[i]+":"+sampletaglist[i] for i in range(len(samplewordlist))))
     # infererence set
