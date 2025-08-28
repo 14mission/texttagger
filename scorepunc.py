@@ -15,16 +15,17 @@ for fn in sys.argv[1:]:
     typedispo[reftag][hyptag] += 1
   allcatscount = 0
   allcatscorrect = 0
-  for type in sorted(typedispo.keys()):
+  for typeanddispos in sorted(typedispo.items(), key=lambda item: str(1.0/item[1]["tot"])+item[0]): # sort by typetot desc, type
+    type, dispos = typeanddispos
     cols = []
     cols.append(type)
-    cols.append(str(typedispo[type]["tot"]))
-    catcount = typedispo[type]["tot"]
-    catcorrectcount = typedispo[type][type] if type in typedispo[type] else 0
+    cols.append(str(dispos["tot"]))
+    catcount = dispos["tot"]
+    catcorrectcount = dispos[type] if type in dispos else 0
     cols.append(str(int(100*catcorrectcount/catcount+0.5))+"%")
     allcatscount += catcount
     allcatscorrect += catcorrectcount
-    for dispoandcount in sorted(typedispo[type].items(), key=lambda item: item[1], reverse=True):
+    for dispoandcount in sorted(dispos.items(), key=lambda item: str(1.0/item[1])+item[0]): # sort by dispotypecount desc, type
       dispo, count = dispoandcount
       if dispo == "tot": continue
       cols.append(dispo+"="+str(count))
