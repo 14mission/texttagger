@@ -13,12 +13,20 @@ for fn in sys.argv[1:]:
       typedispo[reftag][hyptag] = 0
     typedispo[reftag]["tot"] += 1
     typedispo[reftag][hyptag] += 1
+  allcatscount = 0
+  allcatscorrect = 0
   for type in sorted(typedispo.keys()):
     cols = []
     cols.append(type)
     cols.append(str(typedispo[type]["tot"]))
-    for dispo in sorted(typedispo[type].keys()):
+    catcount = typedispo[type]["tot"]
+    catcorrectcount = typedispo[type][type] if type in typedispo[type] else 0
+    cols.append(str(int(100*catcorrectcount/catcount+0.5))+"%")
+    allcatscount += catcount
+    allcatscorrect += catcorrectcount
+    for dispoandcount in sorted(typedispo[type].items(), key=lambda item: item[1], reverse=True):
+      dispo, count = dispoandcount
       if dispo == "tot": continue
-      cols.append(dispo+"="+str(typedispo[type][dispo]))
-    cols.append(str(int(100*((typedispo[type][type] if type in typedispo[type] else 0)/typedispo[type]["tot"])+0.5))+"%")
+      cols.append(dispo+"="+str(count))
     print("\t".join(cols))
+  print("ALL\t"+str(allcatscount)+"\t"+str(int(100*allcatscorrect/allcatscount+0.5))+"%\tself="+str(allcatscorrect)+"\tother="+str(allcatscount-allcatscorrect))
